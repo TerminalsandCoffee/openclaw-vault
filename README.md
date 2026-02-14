@@ -10,35 +10,7 @@ Terraform template that provisions a **hardened Ubuntu 24.04 LTS EC2 instance** 
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────┐
-│  AWS VPC (10.0.0.0/16)                          │
-│  ┌───────────────────────────────────────────┐  │
-│  │  Public Subnet (10.0.1.0/24)              │  │
-│  │  ┌─────────────────────────────────────┐  │  │
-│  │  │  EC2 (Ubuntu 24.04 LTS)             │  │  │
-│  │  │  ┌───────────┐  ┌───────────────┐   │  │  │
-│  │  │  │ Tailscale │  │ Hardening     │   │  │  │
-│  │  │  │ (mesh VPN)│  │ - SSH port    │   │  │  │
-│  │  │  │           │  │ - UFW         │   │  │  │
-│  │  │  │           │  │ - sysctl      │   │  │  │
-│  │  │  │           │  │ - auditd      │   │  │  │
-│  │  │  │           │  │ - fail2ban    │   │  │  │
-│  │  │  │           │  │ - auto-update │   │  │  │
-│  │  │  └───────────┘  └───────────────┘   │  │  │
-│  │  └─────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────┘  │
-│  Security Group: egress only (no public inbound)│
-└─────────────────────────────────────────────────┘
-          │
-          │ Tailscale tunnel (WireGuard)
-          │
-    ┌─────┴─────┐
-    │ Your      │
-    │ Machine   │
-    │ (tailnet) │
-    └───────────┘
-```
+<img width="1337" height="721" alt="image" src="https://github.com/user-attachments/assets/c929240e-0274-4059-813b-4458d31cfcb7" />
 
 ## Prerequisites
 
@@ -53,6 +25,9 @@ Terraform template that provisions a **hardened Ubuntu 24.04 LTS EC2 instance** 
 3. Copy the key — it starts with `tskey-auth-`
 
 ## Quick Start
+
+<img width="1339" height="720" alt="image" src="https://github.com/user-attachments/assets/8e02fab5-480f-41b3-8132-8cb92e8e6777" />
+
 
 ```bash
 # Clone
@@ -118,6 +93,9 @@ ssh -i openclaw-key.pem -p 2222 ubuntu@openclaw
 | `private_key_path` | Path to generated .pem file |
 
 ## Verify Hardening
+
+<img width="1235" height="584" alt="image" src="https://github.com/user-attachments/assets/9d547e0a-0485-47cd-9082-d9a65533ab4e" />
+
 
 After SSH-ing in via Tailscale:
 
