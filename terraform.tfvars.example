@@ -1,0 +1,5 @@
+aws_region         = "us-east-1"
+instance_type      = "t3.micro"
+tailscale_auth_key = "tskey-auth-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXX"
+hostname           = "openclaw"
+ssh_port           = 2222
