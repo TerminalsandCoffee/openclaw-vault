@@ -31,7 +31,7 @@ Terraform template that provisions a **hardened Ubuntu 24.04 LTS EC2 instance** 
 
 ```bash
 # Clone
-git clone https://github.com/yourusername/openclaw-vault.git
+git clone https://github.com/TerminalsandCoffee/openclaw-vault
 cd openclaw-vault
 
 # Configure
