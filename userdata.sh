@@ -10,14 +10,14 @@ export DEBIAN_FRONTEND=noninteractive
 # ============================================================
 # 1. SYSTEM UPDATE
 # ============================================================
-echo "[1/9] Updating system packages..."
+echo "[1/12] Updating system packages..."
 apt-get update -y
 apt-get upgrade -y
 
 # ============================================================
 # 2. INSTALL TAILSCALE
 # ============================================================
-echo "[2/9] Installing Tailscale..."
+echo "[2/12] Installing Tailscale..."
 curl -fsSL https://tailscale.com/install.sh | sh
 
 # Join tailnet with SSH enabled (allows keyless SSH via Tailscale identity)
@@ -31,7 +31,7 @@ echo "Tailscale IP: $(tailscale ip -4)"
 # ============================================================
 # 3. SSH HARDENING
 # ============================================================
-echo "[3/9] Hardening SSH..."
+echo "[3/12] Hardening SSH..."
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 
 cat > /etc/ssh/sshd_config.d/openclaw.conf << 'SSHEOF'
@@ -55,7 +55,7 @@ systemctl restart sshd
 # ============================================================
 # 4. UFW FIREWALL
 # ============================================================
-echo "[4/9] Configuring firewall..."
+echo "[4/12] Configuring firewall..."
 apt-get install -y ufw
 
 ufw default deny incoming
@@ -64,12 +64,15 @@ ufw default allow outgoing
 # Allow SSH only on Tailscale interface
 ufw allow in on tailscale0 to any port ${ssh_port} proto tcp comment "SSH via Tailscale"
 
+# Allow OpenClaw Gateway on Tailscale interface
+ufw allow in on tailscale0 to any port 18789 proto tcp comment "OpenClaw Gateway via Tailscale"
+
 ufw --force enable
 
 # ============================================================
 # 5. KERNEL HARDENING (SYSCTL)
 # ============================================================
-echo "[5/9] Applying kernel hardening..."
+echo "[5/12] Applying kernel hardening..."
 cat > /etc/sysctl.d/99-openclaw.conf << 'SYSCTL'
 # --- IP Spoofing Protection ---
 net.ipv4.conf.all.rp_filter = 1
@@ -117,7 +120,7 @@ sysctl -p /etc/sysctl.d/99-openclaw.conf
 # ============================================================
 # 6. AUTOMATIC SECURITY UPDATES
 # ============================================================
-echo "[6/9] Configuring automatic security updates..."
+echo "[6/12] Configuring automatic security updates..."
 apt-get install -y unattended-upgrades apt-listchanges
 
 cat > /etc/apt/apt.conf.d/50unattended-upgrades << 'AUTOUPDATE'
@@ -141,7 +144,7 @@ systemctl enable unattended-upgrades
 # ============================================================
 # 7. AUDITD
 # ============================================================
-echo "[7/9] Installing and configuring auditd..."
+echo "[7/12] Installing and configuring auditd..."
 apt-get install -y auditd audispd-plugins
 
 cat > /etc/audit/rules.d/openclaw.rules << 'AUDITRULES'
@@ -188,7 +191,7 @@ systemctl restart auditd
 # ============================================================
 # 8. FAIL2BAN
 # ============================================================
-echo "[8/9] Installing and configuring fail2ban..."
+echo "[8/12] Installing and configuring fail2ban..."
 apt-get install -y fail2ban
 
 cat > /etc/fail2ban/jail.local << FAIL2BAN
@@ -212,7 +215,7 @@ systemctl restart fail2ban
 # ============================================================
 # 9. CLEANUP & FINAL HARDENING
 # ============================================================
-echo "[9/9] Final hardening..."
+echo "[9/12] Final hardening..."
 
 # Remove unnecessary packages
 apt-get purge -y telnet 2>/dev/null || true
@@ -243,6 +246,60 @@ MOTD
 
 # Set hostname
 hostnamectl set-hostname "${hostname}"
+
+# ============================================================
+# 10. INSTALL NODE.JS 22
+# ============================================================
+echo "[10/12] Installing Node.js 22..."
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs
+
+# ============================================================
+# 11. INSTALL & CONFIGURE OPENCLAW
+# ============================================================
+echo "[11/12] Installing and configuring OpenClaw..."
+npm install -g openclaw@latest
+
+# Create openclaw config directory
+sudo -u ubuntu mkdir -p /home/ubuntu/.openclaw
+
+# Write OpenClaw config — gateway bound to loopback, served via Tailscale
+sudo -u ubuntu tee /home/ubuntu/.openclaw/openclaw.json > /dev/null << EOF
+{
+  "agent": {
+    "model": "${openclaw_model}"
+  },
+  "models": {
+    "providers": {
+      "anthropic": {
+        "apiKey": "${openclaw_api_key}"
+      }
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "bind": "loopback",
+    "tailscale": { "mode": "serve" },
+    "auth": {
+      "allowTailscale": true
+    }
+  }
+}
+EOF
+
+# ============================================================
+# 12. START OPENCLAW GATEWAY (SYSTEMD USER SERVICE)
+# ============================================================
+echo "[12/12] Starting OpenClaw Gateway..."
+
+# Enable linger so user services start without login (critical for headless)
+loginctl enable-linger ubuntu
+
+# Install the daemon as ubuntu user
+sudo -u ubuntu openclaw onboard --install-daemon --headless
+
+# Start the gateway service
+sudo -u ubuntu XDG_RUNTIME_DIR=/run/user/$(id -u ubuntu) systemctl --user start openclaw-gateway
 
 echo "=== OpenClaw Setup Complete: $(date) ==="
 echo "=== Tailscale IP: $(tailscale ip -4) ==="

@@ -32,3 +32,8 @@ output "tailscale_ssh_command" {
   description = "SSH via Tailscale SSH (no keys needed)"
   value       = "ssh ${var.hostname}"
 }
+
+output "webchat_url" {
+  description = "OpenClaw WebChat UI (accessible from your tailnet)"
+  value       = "https://${var.hostname}/"
+}

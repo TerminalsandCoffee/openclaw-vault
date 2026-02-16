@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t3.micro"
+  default     = "t3.medium"
 }
 
 variable "tailscale_auth_key" {
@@ -43,4 +43,16 @@ variable "ssh_port" {
   description = "SSH port (moved from default 22)"
   type        = number
   default     = 2222
+}
+
+variable "openclaw_api_key" {
+  description = "Anthropic API key for the OpenClaw agent model"
+  type        = string
+  sensitive   = true
+}
+
+variable "openclaw_model" {
+  description = "Model ID for the OpenClaw agent"
+  type        = string
+  default     = "anthropic/claude-sonnet-4-5-20250929"
 }
