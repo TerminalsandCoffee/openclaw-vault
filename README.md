@@ -16,9 +16,33 @@ Terraform template that provisions a **hardened Ubuntu 24.04 LTS EC2 instance** 
 ## Prerequisites
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.12
-- AWS CLI configured (`aws configure`)
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed and configured
 - [Tailscale account](https://tailscale.com/) with an auth key
 - [Anthropic API key](https://console.anthropic.com/) for the OpenClaw agent model
+
+### Configure AWS CLI
+
+Terraform uses your AWS credentials to create resources. If you skip this step, you'll get an error like `no EC2 IMDS role found`.
+
+1. [Install the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) if you haven't already
+2. Create an access key in the [IAM Security Credentials console](https://console.aws.amazon.com/iam/home#/security_credentials)
+3. Run `aws configure` and enter your credentials:
+
+```bash
+aws configure
+# AWS Access Key ID: <your-access-key>
+# AWS Secret Access Key: <your-secret-key>
+# Default region name: us-east-1
+# Default output format: json
+```
+
+4. Verify it works:
+
+```bash
+aws sts get-caller-identity
+```
+
+You should see your account ID and user ARN. If this command fails, Terraform will too.
 
 ### Generate a Tailscale Auth Key
 
@@ -150,6 +174,46 @@ sudo sysctl net.ipv4.tcp_syncookies
 
 # Verify auto-updates
 systemctl status unattended-upgrades
+```
+
+## Troubleshooting
+
+### `no EC2 IMDS role found` / `failed to refresh cached credentials`
+
+Your AWS CLI isn't configured. Run `aws configure` with your access key and secret key. See [Configure AWS CLI](#configure-aws-cli) above.
+
+### `terraform init` fails with `wsarecv: An existing connection was forcibly closed`
+
+This is an IPv6 connectivity issue with the Terraform registry (common on some ISPs). Fix by adding a temporary hosts file entry to force IPv4:
+
+```bash
+# Get the IPv4 address
+nslookup registry.terraform.io
+
+# Add to your hosts file (requires admin/sudo)
+# Windows: C:\Windows\System32\drivers\etc\hosts
+# Linux/macOS: /etc/hosts
+13.224.187.70 registry.terraform.io
+```
+
+Run `terraform init` again, then remove the hosts entry after it succeeds.
+
+### `VpcLimitExceeded`
+
+AWS allows 5 VPCs per region by default. Either delete an unused VPC in the [VPC console](https://console.aws.amazon.com/vpc/home), switch to a different region in `terraform.tfvars`, or [request a limit increase](https://console.aws.amazon.com/servicequotas/).
+
+### Instance deploys but can't SSH via Tailscale
+
+Wait 3-5 minutes after `terraform apply` for cloud-init to complete. Check if the `openclaw` node appears in your [Tailscale admin console](https://login.tailscale.com/admin/machines). If it doesn't, the Tailscale auth key may be expired or invalid — generate a new one and redeploy.
+
+### OpenClaw Gateway not running after deploy
+
+The systemd user service can have timing issues during cloud-init. SSH in and start it manually:
+
+```bash
+ssh openclaw
+systemctl --user start openclaw-gateway
+systemctl --user status openclaw-gateway
 ```
 
 ## Teardown
