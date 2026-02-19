@@ -12,3 +12,6 @@ crash.*.log
 
 # Keys
 *.pem
+
+# blogs
+blog-draft.md

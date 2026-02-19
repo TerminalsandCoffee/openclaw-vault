@@ -145,7 +145,7 @@ systemctl enable unattended-upgrades
 # 7. AUDITD
 # ============================================================
 echo "[7/12] Installing and configuring auditd..."
-apt-get install -y auditd audispd-plugins
+apt-get install -y auditd audisp-plugins
 
 cat > /etc/audit/rules.d/openclaw.rules << 'AUDITRULES'
 # Delete any existing rules
