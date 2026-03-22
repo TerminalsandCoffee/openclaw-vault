@@ -85,8 +85,8 @@ You should see your account ID and user ARN. If this command fails, Terraform wi
 
 ```bash
 # Clone
-git clone https://github.com/TerminalsandCoffee/openclaw-vault
-cd openclaw-vault
+git clone https://github.com/TerminalsandCoffee/openclaw-deploy-zero-trust
+cd openclaw-deploy-zero-trust
 
 # Configure
 cp terraform.tfvars.example terraform.tfvars
