@@ -8,30 +8,53 @@ echo "=== OpenClaw Hardened Instance Setup: $(date) ==="
 export DEBIAN_FRONTEND=noninteractive
 
 # ============================================================
-# 1. SYSTEM UPDATE
+# 1. SYSTEM UPDATE + AWS CLI
 # ============================================================
-echo "[1/12] Updating system packages..."
+echo "[1/13] Updating system packages..."
 apt-get update -y
 apt-get upgrade -y
 
+# Install AWS CLI for Secrets Manager retrieval
+echo "[2/13] Installing AWS CLI..."
+apt-get install -y awscli
+
 # ============================================================
-# 2. INSTALL TAILSCALE
+# 2. RETRIEVE SECRETS FROM AWS SECRETS MANAGER
 # ============================================================
-echo "[2/12] Installing Tailscale..."
+echo "[3/13] Retrieving secrets from Secrets Manager..."
+TAILSCALE_AUTH_KEY=$(aws secretsmanager get-secret-value \
+  --secret-id "${tailscale_secret_arn}" \
+  --region "${aws_region}" \
+  --query SecretString \
+  --output text)
+
+OPENCLAW_API_KEY=$(aws secretsmanager get-secret-value \
+  --secret-id "${openclaw_secret_arn}" \
+  --region "${aws_region}" \
+  --query SecretString \
+  --output text)
+
+# ============================================================
+# 3. INSTALL TAILSCALE
+# ============================================================
+echo "[4/13] Installing Tailscale..."
 curl -fsSL https://tailscale.com/install.sh | sh
 
 # Join tailnet with SSH enabled (allows keyless SSH via Tailscale identity)
 tailscale up \
-  --authkey="${tailscale_auth_key}" \
+  --authkey="$TAILSCALE_AUTH_KEY" \
   --ssh \
   --hostname="${hostname}"
+
+# Clear secret from memory
+unset TAILSCALE_AUTH_KEY
 
 echo "Tailscale IP: $(tailscale ip -4)"
 
 # ============================================================
 # 3. SSH HARDENING
 # ============================================================
-echo "[3/12] Hardening SSH..."
+echo "[5/13] Hardening SSH..."
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 
 cat > /etc/ssh/sshd_config.d/openclaw.conf << 'SSHEOF'
@@ -55,7 +78,7 @@ systemctl restart sshd
 # ============================================================
 # 4. UFW FIREWALL
 # ============================================================
-echo "[4/12] Configuring firewall..."
+echo "[6/13] Configuring firewall..."
 apt-get install -y ufw
 
 ufw default deny incoming
@@ -72,7 +95,7 @@ ufw --force enable
 # ============================================================
 # 5. KERNEL HARDENING (SYSCTL)
 # ============================================================
-echo "[5/12] Applying kernel hardening..."
+echo "[7/13] Applying kernel hardening..."
 cat > /etc/sysctl.d/99-openclaw.conf << 'SYSCTL'
 # --- IP Spoofing Protection ---
 net.ipv4.conf.all.rp_filter = 1
@@ -120,7 +143,7 @@ sysctl -p /etc/sysctl.d/99-openclaw.conf
 # ============================================================
 # 6. AUTOMATIC SECURITY UPDATES
 # ============================================================
-echo "[6/12] Configuring automatic security updates..."
+echo "[8/13] Configuring automatic security updates..."
 apt-get install -y unattended-upgrades apt-listchanges
 
 cat > /etc/apt/apt.conf.d/50unattended-upgrades << 'AUTOUPDATE'
@@ -144,7 +167,7 @@ systemctl enable unattended-upgrades
 # ============================================================
 # 7. AUDITD
 # ============================================================
-echo "[7/12] Installing and configuring auditd..."
+echo "[9/13] Installing and configuring auditd..."
 apt-get install -y auditd audisp-plugins
 
 cat > /etc/audit/rules.d/openclaw.rules << 'AUDITRULES'
@@ -191,7 +214,7 @@ systemctl restart auditd
 # ============================================================
 # 8. FAIL2BAN
 # ============================================================
-echo "[8/12] Installing and configuring fail2ban..."
+echo "[10/13] Installing and configuring fail2ban..."
 apt-get install -y fail2ban
 
 cat > /etc/fail2ban/jail.local << FAIL2BAN
@@ -215,7 +238,7 @@ systemctl restart fail2ban
 # ============================================================
 # 9. CLEANUP & FINAL HARDENING
 # ============================================================
-echo "[9/12] Final hardening..."
+echo "[11/13] Final hardening..."
 
 # Remove unnecessary packages
 apt-get purge -y telnet 2>/dev/null || true
@@ -250,20 +273,21 @@ hostnamectl set-hostname "${hostname}"
 # ============================================================
 # 10. INSTALL NODE.JS 22
 # ============================================================
-echo "[10/12] Installing Node.js 22..."
+echo "[12/13] Installing Node.js 22..."
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 
 # ============================================================
 # 11. INSTALL & CONFIGURE OPENCLAW
 # ============================================================
-echo "[11/12] Installing and configuring OpenClaw..."
+echo "[13/13] Installing and configuring OpenClaw..."
 npm install -g openclaw@latest
 
 # Create openclaw config directory
 sudo -u ubuntu mkdir -p /home/ubuntu/.openclaw
 
 # Write OpenClaw config — gateway bound to loopback, served via Tailscale
+# API key retrieved from Secrets Manager earlier, not baked into user_data
 sudo -u ubuntu tee /home/ubuntu/.openclaw/openclaw.json > /dev/null << EOF
 {
   "agent": {
@@ -272,7 +296,7 @@ sudo -u ubuntu tee /home/ubuntu/.openclaw/openclaw.json > /dev/null << EOF
   "models": {
     "providers": {
       "anthropic": {
-        "apiKey": "${openclaw_api_key}"
+        "apiKey": "$OPENCLAW_API_KEY"
       }
     }
   },
@@ -287,10 +311,16 @@ sudo -u ubuntu tee /home/ubuntu/.openclaw/openclaw.json > /dev/null << EOF
 }
 EOF
 
+# Restrict config file permissions (contains API key)
+chmod 600 /home/ubuntu/.openclaw/openclaw.json
+
+# Clear secret from memory
+unset OPENCLAW_API_KEY
+
 # ============================================================
-# 12. START OPENCLAW GATEWAY (SYSTEMD USER SERVICE)
+# START OPENCLAW GATEWAY (SYSTEMD USER SERVICE)
 # ============================================================
-echo "[12/12] Starting OpenClaw Gateway..."
+echo "Starting OpenClaw Gateway..."
 
 # Enable linger so user services start without login (critical for headless)
 loginctl enable-linger ubuntu

@@ -14,14 +14,22 @@ resource "aws_internet_gateway" "openclaw" {
   tags = { Name = "openclaw-igw" }
 }
 
-# --- Public Subnet ---
+# --- Availability Zones ---
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+# --- Subnet ---
+# Public IP is required for outbound internet (apt, Tailscale, npm) without a NAT Gateway.
+# The security group has zero inbound rules, so the public IP has no listening attack surface.
+# For production, replace with a private subnet + NAT Gateway (~$32/month extra).
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.openclaw.id
   cidr_block              = var.subnet_cidr
   map_public_ip_on_launch = true
-  availability_zone       = "${var.aws_region}a"
+  availability_zone       = data.aws_availability_zones.available.names[0]
 
-  tags = { Name = "openclaw-public" }
+  tags = { Name = "openclaw-subnet" }
 }
 
 # --- Route Table ---

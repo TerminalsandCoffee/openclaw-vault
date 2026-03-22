@@ -1,7 +1,26 @@
-aws_region         = "us-east-1"
-instance_type      = "t3.medium"
+# AWS region where the instance will be deployed
+aws_region = "us-east-1"
+
+# EC2 instance type
+# t3.micro  — free tier eligible, ~$8/month after
+# t3.medium — recommended for OpenClaw, ~$30/month
+instance_type = "t3.medium"
+
+# Tailscale auth key — get from https://login.tailscale.com/admin/settings/keys
+# Must start with "tskey-auth-"
 tailscale_auth_key = "tskey-auth-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXX"
-hostname           = "openclaw"
-ssh_port           = 2222
-openclaw_api_key   = "sk-ant-XXXXXXXXXXXXXXXXXXXX"
-openclaw_model     = "anthropic/claude-sonnet-4-5-20250929"
+
+# Hostname visible in Tailscale admin console and used for SSH
+hostname = "openclaw"
+
+# SSH port for traditional SSH access (Tailscale SSH doesn't use this)
+ssh_port = 2222
+
+# Anthropic API key — get from https://console.anthropic.com/
+# Must start with "sk-ant-"
+# WARNING: Do NOT commit this file with real keys. Keep terraform.tfvars in .gitignore.
+openclaw_api_key = "sk-ant-XXXXXXXXXXXXXXXXXXXX"
+
+# Model ID for the OpenClaw agent
+# See https://docs.anthropic.com/ for available models
+openclaw_model = "anthropic/claude-sonnet-4-5-20250929"
